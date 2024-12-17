@@ -57,7 +57,7 @@ Jesli na obrazie bedzie napis Generali Investments wykonaj nastepujace polecenie
 Na podstawie screenu pobierz dane na temat ogolnej wartosci rachunku oraz bilansu.
 Dane przedstaw w formacie JSON - bez komentarzy same dane w nastepujacym formacie:
 {
-    "GEnerali": {
+    "Generali": {
         "Wartosc": "30000PLN",
         "Zysk": "400PLN"
     }
@@ -71,18 +71,36 @@ Dane zapiszesz w formacie JSON:
 {
     "Kryptowaluty": {
         "Wartosc": "30000PLN", (- znajdziesz ja na gorze obrazu pogrubiona czacionka pod paskiem 'Szukaj')
+        "Zysk": "400PLN" (nie dodawaj znaku + lub - tylko sama liczbe)
+    }
+}
+
+Jesli na obrazie zobaczysz nazwe IKE (PLN) wykonasz nastepujace polecenie:
+Na podstawie screenu pobierzesz 2 wartosci liczbowe. 
+Pierwsza wartosc bedzie pod tekstem "Wartosc IKE (PLN) i bedzie reprezentowac klucz  "Wartosc".
+Druga wartosc bedzie pod tekstem "Zysk/strata" i bedzie reprezentowac klicz "Zysk"
+Dane zapiszesz w formacie JSON: 
+{
+    "XTB_IKE": {
+        "Wartosc": "30000PLN", 
         "Zysk": "400PLN"
     }
 }
 
+Jesli na obrazie zobaczysz nazwe "Total Portfolio Value" wykonasz nastepujace polecenie:
+Na podstawie screenu pobierzesz jedna wartosc liczbowa znajdujaca sie pod tekstem "Total Portfolio value"
+i bedzie reprezentowac klucz wartosc i zysk.
+
+
+Dane zapiszesz w formacie JSON: 
+{
+    "Nokia_Akcje": {
+        "Wartosc": "30000PLN", 
+        "Zysk": "(tu wklej te sama liczbe co w kluczu wartosc)"
+    }
+}
+
 """
-
-# Path locations
-RAW_IMAGE_FOLDER = Path("Images")
-PROCESSED_IMAGES = RAW_IMAGE_FOLDER / "Processed"
-
-for image_path in RAW_IMAGE_FOLDER.glob("*"):
-    st.write(image_path)
 
 
 # Prepreration file for openai
@@ -111,7 +129,7 @@ def generate_ai_response(file_name, file_bytes):
 
     response = openai_client.chat.completions.create(
         
-        model="gpt-4o",
+        model="gpt-4o-mini",
         temperature=0,
         messages=[
             {
@@ -136,25 +154,31 @@ def generate_ai_response(file_name, file_bytes):
 
     return (response.choices[0].message.content)
 
-uploaded_files = st.file_uploader(
-    label="Upload Portfolio screens", 
-    accept_multiple_files=True,
-    type=["png", "jpg", "jpeg"]
-    )
+with st.form("File_uploader_form"):
 
 
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        st.write(f"Processing file: **{uploaded_file.name}**")
+    uploaded_files = st.file_uploader(
+        label="Upload Portfolio screens", 
+        accept_multiple_files=True,
+        type=["png", "jpg", "jpeg"]
+        )
 
-        file_bytes = uploaded_file.read()
+
+    submitted = st.form_submit_button("Generate AI response")
+    if submitted:
         
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                st.write(f"Processing file: **{uploaded_file.name}**")
 
-        with st.spinner("Generatin AI response..."):
-            try:
-                ai_response = generate_ai_response(uploaded_file.name, file_bytes)
-                st.success("Response generated!")
-                st.write("**AI Response:**")
-                st.write(ai_response)
-            except Exception as e:
-                st.error(f"Error: {e}")
+                file_bytes = uploaded_file.read()
+                
+
+                with st.spinner("Generatin AI response..."):
+                    try:
+                        ai_response = generate_ai_response(uploaded_file.name, file_bytes)
+                        st.success("Response generated!")
+                        st.write("**AI Response:**")
+                        st.write(ai_response)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
