@@ -16,6 +16,7 @@ from dotenv import dotenv_values
 
 st.set_page_config(page_title="Portfolio_tracker", layout="centered")
 env = dotenv_values(".env")
+screen_to_json_path = Path("Images/Processed")
 
 # API key protection
 
@@ -122,13 +123,16 @@ def prep_file_for_openai(file_name, file_bytes):
     return f"data:{mime_type};base64,{image_data}"
 
 
-# Openai Function
-def generate_ai_response(file_name, file_bytes):
+# New function to save AI response to a JSON file
+def save_response_to_json(response, filename):
+    with open(filename, 'w') as json_file:
+        json.dump(response, json_file, ensure_ascii=False, indent=4)
 
+# Modify the existing function to save the response
+def generate_ai_response(file_name, file_bytes):
     encoded_image = prep_file_for_openai(file_name, file_bytes)
 
     response = openai_client.chat.completions.create(
-        
         model="gpt-4o-mini",
         temperature=0,
         messages=[
@@ -151,34 +155,49 @@ def generate_ai_response(file_name, file_bytes):
         ],
     )
 
+    # Extract the content and clean it up
+    content = response.choices[0].message.content.replace("```json", "").replace("```", "").strip()  # Clean leading/trailing whitespace
 
-    return (response.choices[0].message.content)
+
+
+    # Fix the incorrect period to a comma between key-value pairs
+    content = content.replace("PLN.", "PLN,")  # Replace the incorrect period after PLN with a comma
+
+    # Print cleaned content for debugging
+    print("Cleaned AI Response:", content)  # Debugging line
+
+    try:
+        # Attempt to parse the cleaned content to ensure it's valid JSON
+        json_response = json.loads(content)
+    except json.JSONDecodeError:
+        raise ValueError("Response is not valid JSON.")
+
+    return json_response
 
 with st.form("File_uploader_form"):
-
-
     uploaded_files = st.file_uploader(
         label="Upload Portfolio screens", 
         accept_multiple_files=True,
         type=["png", "jpg", "jpeg"]
-        )
-
+    )
 
     submitted = st.form_submit_button("Generate AI response")
     if submitted:
-        
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 st.write(f"Processing file: **{uploaded_file.name}**")
 
                 file_bytes = uploaded_file.read()
-                
 
-                with st.spinner("Generatin AI response..."):
+                with st.spinner("Generating AI response..."):
                     try:
                         ai_response = generate_ai_response(uploaded_file.name, file_bytes)
                         st.success("Response generated!")
                         st.write("**AI Response:**")
                         st.write(ai_response)
+
+                        # Save the AI response to a JSON file
+                        save_response_to_json(ai_response, f"{screen_to_json_path}/{uploaded_file.name}_response.json")
+                        st.success(f"Response saved to {uploaded_file.name}_response.json")
                     except Exception as e:
                         st.error(f"Error: {e}")
