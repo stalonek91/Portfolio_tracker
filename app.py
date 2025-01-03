@@ -17,6 +17,7 @@ from dotenv import dotenv_values
 st.set_page_config(page_title="Portfolio_tracker", layout="centered")
 env = dotenv_values(".env")
 screen_to_json_path = Path("Images/Processed")
+response_df = pd.DataFrame(columns=["Wallet", "Value", "Profit"])
 
 # API key protection
 
@@ -192,12 +193,31 @@ with st.form("File_uploader_form"):
                 with st.spinner("Generating AI response..."):
                     try:
                         ai_response = generate_ai_response(uploaded_file.name, file_bytes)
-                        st.success("Response generated!")
-                        st.write("**AI Response:**")
-                        st.write(ai_response)
 
-                        # Save the AI response to a JSON file
-                        save_response_to_json(ai_response, f"{screen_to_json_path}/{uploaded_file.name}_response.json")
-                        st.success(f"Response saved to {uploaded_file.name}_response.json")
+                        # Extract data from the AI response and create a temporary DataFrame
+                        temp_df = pd.DataFrame([
+                            {
+                                "Wallet": wallet,
+                                "Value": data.get("Wartosc"),
+                                "Profit": data.get("Zysk")
+                            }
+                            for wallet, data in ai_response.items()
+                        ])
+
+                        # Concatenate the temporary DataFrame with the main response DataFrame
+                        response_df = pd.concat([response_df, temp_df], ignore_index=True)
+
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        st.error(f"Error during AI response generation: {e}")
+                        continue  # Skip to the next file
+
+                # Attempt to save the AI response to a JSON file
+                try:
+                    save_response_to_json(ai_response, f"{screen_to_json_path}/{uploaded_file.name}_response.json")
+                except Exception as e:
+                    st.error(f"Error saving response to JSON: {e}")
+
+# Display the DataFrame at the end of processing
+if not response_df.empty:
+    st.write("**AI Responses Summary:**")
+    st.dataframe(response_df)
