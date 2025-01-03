@@ -13,8 +13,14 @@ from openai import OpenAI
 import pandas as pd
 from dotenv import dotenv_values
 
-
 st.set_page_config(page_title="Portfolio_tracker", layout="centered")
+
+# Debugging: Print all session state keys and values at the start of each run
+st.write("Session State at Start:")
+for key in st.session_state.keys():
+    st.write(f"{key}: {st.session_state[key]}")
+
+
 env = dotenv_values(".env")
 screen_to_json_path = Path("Images/Processed")
 response_df = pd.DataFrame(columns=["Wallet", "Value", "Profit"])
@@ -134,7 +140,7 @@ def generate_ai_response(file_name, file_bytes):
     encoded_image = prep_file_for_openai(file_name, file_bytes)
 
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         temperature=0,
         messages=[
             {
@@ -184,11 +190,8 @@ with st.form("File_uploader_form"):
     )
     submitted = st.form_submit_button("Generate AI response")
     if submitted:
-        print("AI Response Form Submitted!")  # Debugging line
         if uploaded_files:
             for uploaded_file in uploaded_files:
-                st.write(f"Processing file: **{uploaded_file.name}**")
-
                 file_bytes = uploaded_file.read()
 
                 with st.spinner("Generating AI response..."):
@@ -218,20 +221,22 @@ with st.form("File_uploader_form"):
                 except Exception as e:
                     st.error(f"Error saving response to JSON: {e}")
 
-# Initialize a final DataFrame to store validated responses
-final_response_df = pd.DataFrame(columns=["Wallet", "Value", "Profit", "Date Added"])
+        # Update the session state with the populated response_df
+        st.session_state.response_df = response_df  # Ensure this line is executed after processing all files
 
-# Display the DataFrame at the end of processing
-if not response_df.empty:
-    st.write("**AI Responses Summary:**")
-    st.dataframe(response_df)
+# Initialize a final DataFrame to store validated responses
+if 'response_df' not in st.session_state:
+    st.session_state.response_df = pd.DataFrame(columns=["Wallet", "Value", "Profit", "Date Added"])
 
 # Second form for user validation
+if 'corrected_data' not in st.session_state:
+    st.session_state.corrected_data = []  # Initialize corrected_data in session state
+
 with st.form("Validation_form"):
     st.write("**Please validate the retrieved data:**")
     
-    # Create a list to hold the corrected data
-    corrected_data = []
+    # Access the response_df from session state
+    response_df = st.session_state.response_df
 
     # Display each row for validation
     for index, row in response_df.iterrows():
@@ -239,25 +244,36 @@ with st.form("Validation_form"):
         value = st.text_input(f"Value for {wallet}:", value=row['Value'], key=f"value_{index}")  # Added key for uniqueness
         profit = st.text_input(f"Profit for {wallet}:", value=row['Profit'], key=f"profit_{index}")  # Added key for uniqueness
         date_added = st.text_input(f"Date Added for {wallet}:", value=datetime.now().strftime("%Y-%m-%d"), key=f"date_{index}")  # Added date input
-        corrected_data.append({
-            "Wallet": wallet,
-            "Value": value,
-            "Profit": profit,
-            "Date Added": date_added  # Use the date from the input
-        })
         st.write("---")  # Separator for clarity
 
     # Submit button for validation
     validate = st.form_submit_button("Validate and Save Data")
     
     if validate:
-        print("Validation Form Submitted!")  # Debugging line
-        print("Corrected Data:", corrected_data)  # Log corrected data for debugging
-        
+        # Collect data after form submission
+        for index, row in response_df.iterrows():
+            wallet = row['Wallet']
+            value = st.session_state[f"value_{index}"]  # Get the value from session state
+            profit = st.session_state[f"profit_{index}"]  # Get the profit from session state
+            date_added = st.session_state[f"date_{index}"]  # Get the date from session state
+            
+            # Check if the values are being retrieved correctly
+            if value and profit and date_added:
+                data_to_append = {
+                    "Wallet": wallet,
+                    "Value": value,
+                    "Profit": profit,
+                    "Date Added": date_added,
+                }
+
+                st.session_state.corrected_data.append(data_to_append)
+
         # Create a DataFrame from the corrected data
-        final_response_df = pd.DataFrame(corrected_data)
+        final_response_df = pd.DataFrame(st.session_state.corrected_data)
         if final_response_df.empty:
             st.warning("No data to save. Please check your inputs.")
         else:
             st.success("Data has been validated and saved.")
             st.dataframe(final_response_df)  # Display the final DataFrame
+
+         
