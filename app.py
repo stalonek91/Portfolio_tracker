@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 import base64
 from getpass import getpass
 import mimetypes
@@ -175,15 +175,16 @@ def generate_ai_response(file_name, file_bytes):
 
     return json_response
 
+# First form for generating AI response
 with st.form("File_uploader_form"):
     uploaded_files = st.file_uploader(
         label="Upload Portfolio screens", 
         accept_multiple_files=True,
         type=["png", "jpg", "jpeg"]
     )
-
     submitted = st.form_submit_button("Generate AI response")
     if submitted:
+        print("AI Response Form Submitted!")  # Debugging line
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 st.write(f"Processing file: **{uploaded_file.name}**")
@@ -217,7 +218,46 @@ with st.form("File_uploader_form"):
                 except Exception as e:
                     st.error(f"Error saving response to JSON: {e}")
 
+# Initialize a final DataFrame to store validated responses
+final_response_df = pd.DataFrame(columns=["Wallet", "Value", "Profit", "Date Added"])
+
 # Display the DataFrame at the end of processing
 if not response_df.empty:
     st.write("**AI Responses Summary:**")
     st.dataframe(response_df)
+
+# Second form for user validation
+with st.form("Validation_form"):
+    st.write("**Please validate the retrieved data:**")
+    
+    # Create a list to hold the corrected data
+    corrected_data = []
+
+    # Display each row for validation
+    for index, row in response_df.iterrows():
+        wallet = row['Wallet']
+        value = st.text_input(f"Value for {wallet}:", value=row['Value'], key=f"value_{index}")  # Added key for uniqueness
+        profit = st.text_input(f"Profit for {wallet}:", value=row['Profit'], key=f"profit_{index}")  # Added key for uniqueness
+        date_added = st.text_input(f"Date Added for {wallet}:", value=datetime.now().strftime("%Y-%m-%d"), key=f"date_{index}")  # Added date input
+        corrected_data.append({
+            "Wallet": wallet,
+            "Value": value,
+            "Profit": profit,
+            "Date Added": date_added  # Use the date from the input
+        })
+        st.write("---")  # Separator for clarity
+
+    # Submit button for validation
+    validate = st.form_submit_button("Validate and Save Data")
+    
+    if validate:
+        print("Validation Form Submitted!")  # Debugging line
+        print("Corrected Data:", corrected_data)  # Log corrected data for debugging
+        
+        # Create a DataFrame from the corrected data
+        final_response_df = pd.DataFrame(corrected_data)
+        if final_response_df.empty:
+            st.warning("No data to save. Please check your inputs.")
+        else:
+            st.success("Data has been validated and saved.")
+            st.dataframe(final_response_df)  # Display the final DataFrame
